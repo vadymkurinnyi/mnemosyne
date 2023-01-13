@@ -4,7 +4,7 @@ pub mod data;
 pub mod api;
 use api::*;
 use actix_web::{ App, HttpServer, middleware::Logger};
-use data::{AppState, create_app_state};
+use data::*;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

@@ -1,6 +1,8 @@
+@host = localhost:8080
+
 ###
 # @name createTask
-POST http://localhost:8080/task HTTP/1.1
+POST http://{{host}}/task HTTP/1.1
 content-type: application/json
 
 {
@@ -9,9 +11,18 @@ content-type: application/json
 }
 ###
 
+# @name updateTask
+PATCH http://{{host}}/task?id={{createTask.response.body.*}} HTTP/1.1
+content-type: application/json
+
+[
+  { "op": "replace", "path": "/content", "value": "New content for API task" }
+]
+###
+
 # @name getTask
-GET http://localhost:8080/task?id={{createTask.response.body.*}} HTTP/1.1
+GET http://{{host}}/task?id={{createTask.response.body.*}} HTTP/1.1
 ###
 # @name  deleteTask
-DELETE http://localhost:8080/task?id={{createTask.response.body.*}} HTTP/1.1
+DELETE http://{{host}}/task?id={{createTask.response.body.*}} HTTP/1.1
 ###

@@ -1,6 +1,6 @@
 use getset::{Getters};
 
-#[derive(Getters, Clone)]
+#[derive(Getters, Clone, Serialize, Deserialize)]
 pub struct Task {
     #[getset(get = "pub")]
     pub(crate) id: Uuid,
@@ -9,6 +9,7 @@ pub struct Task {
     #[getset(get = "pub")]
     pub(crate) content: String,
 }
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 use crate::repository::task_dbo::TaskDbo;

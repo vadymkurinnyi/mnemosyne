@@ -1,14 +1,18 @@
-use actix_web::{ResponseError, HttpResponse, http::header::ContentType};
+use actix_web::{http::header::ContentType, http::StatusCode, HttpResponse, ResponseError};
 use derive_more::Display;
 
 #[derive(Debug, Display)]
 pub enum TaskError {
     NotFound,
+    InvalidPatch,
+    InternalError,
 }
 impl ResponseError for TaskError {
-    fn status_code(&self) -> actix_web::http::StatusCode {
+    fn status_code(&self) -> StatusCode {
         match self {
-            TaskError::NotFound => actix_web::http::StatusCode::NOT_FOUND
+            TaskError::NotFound => StatusCode::NOT_FOUND,
+            TaskError::InvalidPatch => StatusCode::BAD_REQUEST,
+            TaskError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
