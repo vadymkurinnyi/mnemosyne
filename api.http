@@ -1,0 +1,17 @@
+###
+# @name createTask
+POST http://localhost:8080/task HTTP/1.1
+content-type: application/json
+
+{
+    "title": "Develop API",
+    "content": "Use actix framework for developing the API"
+}
+###
+
+# @name getTask
+GET http://localhost:8080/task?id={{createTask.response.body.*}} HTTP/1.1
+###
+# @name  deleteTask
+DELETE http://localhost:8080/task?id={{createTask.response.body.*}} HTTP/1.1
+###
