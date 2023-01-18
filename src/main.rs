@@ -1,25 +1,46 @@
+pub mod api;
 pub mod models;
 pub mod repository;
-pub mod data;
-pub mod api;
+mod middleware;
+pub use middleware::TokenClaims;
+use actix_web::{
+    middleware::Logger, web, App, HttpServer,
+};
+use actix_web_httpauth::{
+    middleware::HttpAuthentication,
+};
 use api::*;
-use actix_web::{ App, HttpServer, middleware::Logger};
-use data::*;
+use repository::create_pool;
+
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "info");
     std::env::set_var("RUST_BACKTRACE", "1");
     env_logger::init();
-    let data = create_app_state(); 
-
+    let repos = actix_web::web::Data::new(repository::MemoryTaskRepos::new());
+    let pool = create_pool().await.expect("Database connection failed");
+    repository::processing_migration().await.expect("Database migration failed");
     HttpServer::new(move || {
+        let bearer_middleware = HttpAuthentication::bearer(middleware::validate);
         let logger = Logger::default();
         App::new()
-        .wrap(logger)
-        .app_data(data.clone())
-        .configure(api_config)
-
+            .wrap(logger)
+            
+            // .wrap(IdentityMiddleware::default())
+            // .wrap(SessionMiddleware::new(
+            //     redis_store.clone(),
+            //     secret_key.clone(),
+            // ))
+            .app_data(repos.clone())
+            .app_data(web::Data::new(pool.clone()))
+            .service(api::auth::create_user)
+            .service(api::auth::basic_auth)
+            .service(
+                web::scope("")
+                .wrap(bearer_middleware)
+                .configure(api_config)
+            )
     })
     .bind(("127.0.0.1", 8080))?
     .run()

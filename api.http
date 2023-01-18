@@ -10,19 +10,52 @@ content-type: application/json
     "content": "Use actix framework for developing the API"
 }
 ###
+# # @name updateTask
+# PATCH http://{{host}}/task?id={{createTask.response.body.$.id}} HTTP/1.1
+# content-type: application/json
 
-# @name updateTask
-PATCH http://{{host}}/task?id={{createTask.response.body.*}} HTTP/1.1
-content-type: application/json
+# [
+#   { "op": "replace", "path": "/content", "value": "New content for API task" }
+# ]
+# ###
+# # @name getTask
+# GET http://{{host}}/task?id={{createTask.response.body.$.id}} HTTP/1.1
+# ###
+# # @name  deleteTask
+# DELETE http://{{host}}/task?id={{createTask.response.body.$.id}} HTTP/1.1
+# ###
+# @name healthCheck
+GET http://{{host}}/health
+###
+# @name addUser
+POST  http://{{host}}/user
+Content-Type: application/json
 
-[
-  { "op": "replace", "path": "/content", "value": "New content for API task" }
-]
+{
+  "name": "John21",
+  "email": "John21@gmail.com"
+}
+###
+# @name getUsers
+GET   http://{{host}}/user
 ###
 
-# @name getTask
-GET http://{{host}}/task?id={{createTask.response.body.*}} HTTP/1.1
+# @name registration
+POST  http://{{host}}/create_user
+Content-Type: application/json
+
+{
+  "name": "Vados",
+  "email": "test@gmail.com",
+  "password": "1234"
+}
 ###
-# @name  deleteTask
-DELETE http://{{host}}/task?id={{createTask.response.body.*}} HTTP/1.1
+# @name login
+POST  http://{{host}}/auth
+Content-Type: application/json
+
+{
+  "email": "test@gmail.com",
+  "password": "1234"
+}
 ###
