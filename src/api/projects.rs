@@ -37,6 +37,7 @@ pub async fn create(
     pool: web::Data<PgPool>,
     task: web::Json<CreateTask>,
 ) -> ProjectResult<ProjectId> {
+
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
     let mut transaction = pool.begin().await.map_err(|e| ProjectError::Database(e))?;
     

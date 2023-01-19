@@ -26,12 +26,6 @@ async fn main() -> std::io::Result<()> {
         let logger = Logger::default();
         App::new()
             .wrap(logger)
-            
-            // .wrap(IdentityMiddleware::default())
-            // .wrap(SessionMiddleware::new(
-            //     redis_store.clone(),
-            //     secret_key.clone(),
-            // ))
             .app_data(repos.clone())
             .app_data(web::Data::new(pool.clone()))
             .service(api::auth::create_user)

@@ -3,15 +3,18 @@ use actix_web_httpauth::extractors::{
     bearer::{self, BearerAuth},
     AuthenticationError,
 };
-use hmac::{Hmac, Mac};
-use jwt::VerifyWithKey;
+use jsonwebtoken::{decode, DecodingKey, Validation};
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TokenClaims {
     pub id: uuid::Uuid,
-    //info about user, permissins
+    pub exp: usize,
+}
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Claims {
+    pub id: uuid::Uuid,
 }
 
 pub(crate) async fn validate(
@@ -19,19 +22,24 @@ pub(crate) async fn validate(
     credetional: BearerAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not specified");
-    let key: Hmac<Sha256> = Hmac::new_from_slice(jwt_secret.as_bytes()).unwrap();
     let token_string = credetional.token();
+    info!("received token: '{}'", token_string);
 
-    let claims: Result<TokenClaims, &str> = token_string
-        .verify_with_key(&key)
-        .map_err(|_| "Invalid token");
+    let token = decode::<TokenClaims>(
+        &token_string,
+        &DecodingKey::from_secret(jwt_secret.as_ref()),
+        &Validation::default(),
+    );
 
-    match claims {
-        Ok(value) => {
-            req.extensions_mut().insert(value);
+    match token {
+        Ok(token) => {
+            info!("'{:#?}' inserting token... ", &token);
+            req.extensions_mut().insert(token.claims);
             Ok(req)
         }
-        Err(_) => {
+        Err(e) => {
+            warn!("error while decode token: '{}', '{}'", token_string, e);
+
             let config = req
                 .app_data::<bearer::Config>()
                 .cloned()
