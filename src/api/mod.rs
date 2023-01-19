@@ -19,7 +19,6 @@ pub fn  api_config(cfg: &mut web::ServiceConfig) {
     .service(delete_task)
     .service(update_task)
     .service(health_get)
-    .service(add_user)
     .service(get_users)
     .service(projects::create)
     .service(projects::delete)

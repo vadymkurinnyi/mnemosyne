@@ -5,9 +5,9 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use log::info;
 use serde::Serialize;
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow};
 
-use crate::TokenClaims;
+use crate::{TokenClaims, AppState};
 
 #[derive(FromRow)]
 struct AuthUser {
@@ -22,7 +22,7 @@ struct AuthToken {
 }
 
 #[get("/auth")]
-pub async fn basic_auth(pool: web::Data<PgPool>, credentials: BasicAuth) -> impl Responder {
+pub async fn basic_auth(state: web::Data<AppState>, credentials: BasicAuth) -> impl Responder {
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not specified");
     let user_id = credentials.user_id();
     let password = credentials.password();
@@ -35,10 +35,10 @@ pub async fn basic_auth(pool: web::Data<PgPool>, credentials: BasicAuth) -> impl
         return HttpResponse::Unauthorized().json("Must provide password");
     }
     let password = password.unwrap();
-    let mut transaction = pool.begin().await.unwrap();
+    let pool = &state.db;
     let user = sqlx::query_as::<_, AuthUser>("SELECT id, passhash FROM users where email = $1;")
         .bind(user_id)
-        .fetch_optional(&mut transaction)
+        .fetch_optional(pool)
         .await
         .unwrap();
     info!("try login: '{}', is use found: {}", user_id, user.is_some());

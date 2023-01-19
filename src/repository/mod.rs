@@ -1,8 +1,6 @@
 mod objects;
 mod storage;
 use log::info;
-pub use objects::task_dbo;
-pub use objects::user::*;
 
 use sqlx::migrate::MigrateDatabase;
 use sqlx::postgres::{PgPool, PgPoolOptions};

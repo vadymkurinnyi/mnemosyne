@@ -4,8 +4,9 @@ use anyhow::{anyhow, Ok, Result};
 use tokio::sync::Mutex;
 use sqlx::types::Uuid;
 
-use super::task_dbo::TaskDbo;
 use async_trait::async_trait;
+
+use super::objects::task_dbo::TaskDbo;
 
 #[async_trait]
 pub trait TaskRepository {

@@ -23,13 +23,12 @@ pub async fn health_get(client: Data<PgPool>) -> HttpResponse {
 pub async fn test_database(
     postgres: web::Data<PgPool>,
 ) -> Result<(), sqlx::Error> {
-    let mut transaction = postgres.acquire().await?;
     sqlx::query(
         "
         SELECT 1
         ",
     )
-    .execute(&mut transaction)
+    .execute(postgres.as_ref())
     .await
     .map(|_| ())
 }

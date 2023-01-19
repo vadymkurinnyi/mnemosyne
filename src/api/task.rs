@@ -1,12 +1,11 @@
 use std::sync::Arc;
-use crate::TokenClaims;
+use crate::{TokenClaims, AppState};
 use crate::api::TaskError;
 use crate::repository::TaskRepository;
 use actix_web::web::ReqData;
 use actix_web::{delete, get, post, patch, web, web::Json, Result};
 use log::{error};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use uuid::Uuid;
 use crate::models::task::TaskDbo;
 type TaskResult<T> = Result<Json<T>, TaskError>;
@@ -14,13 +13,10 @@ type TaskResult<T> = Result<Json<T>, TaskError>;
 #[post("/task")]
 async fn create(
     task: web::Json<CreateTask>,
-    pool: web::Data<PgPool>,
+    state: web::Data<AppState>,
 ) -> TaskResult<TaskId> {
     let task = task.into_inner();
-    let mut transaction = pool.begin().await.map_err(|e| {
-        println!("begin: {:?}", e);
-        TaskError::InternalError
-    })?;
+    let pool = &state.db;
     
     let uuid = uuid::Uuid::new_v4();
     let id = sqlx::query_as!(
@@ -32,16 +28,13 @@ async fn create(
         task.description,
         false
     )
-    .fetch_one(&mut transaction)
+    .fetch_one(pool)
     .await
     .map_err(|e| {
         println!("insert: {:?}", e);
         TaskError::InternalError
     })?;
-    transaction.commit().await.map_err(|e| {
-        println!("commit: {:?}", e);
-        TaskError::InternalError
-    })?;
+
     Ok(Json(TaskId::from(id)))
 }
 
@@ -49,31 +42,25 @@ async fn create(
 pub async fn get(
     query: web::Path<TaskId>,
     req_user: Option<ReqData<TokenClaims>>,
-    pool: web::Data<PgPool>,
+    state: web::Data<AppState>,
 ) -> TaskResult<TaskView> {
 
     let user = req_user.ok_or(TaskError::InternalError)?.into_inner();
-    let mut transaction = pool.begin().await.map_err(|e| {
-        println!("begin: {:?}", e);
-        TaskError::InternalError
-    })?;
+    let pool = &state.db;
+
     let task = sqlx::query_as!(
         TaskDbo,
         "SELECT * FROM Tasks where id = $1 AND project_id IN (SELECT id FROM Projects WHERE owner_id = $2);",
         query.id,
         user.id
     )
-    .fetch_one(&mut transaction)
+    .fetch_one(pool)
     .await
     .map_err(|e| {
         println!("select: {:?}", e);
         TaskError::InternalError
     })?;
 
-    transaction.commit().await.map_err(|e| {
-        println!("commit: {:?}", e);
-        TaskError::InternalError
-    })?;
     Ok(Json(TaskView::from(task)))
 }
 
@@ -81,13 +68,11 @@ pub async fn get(
 async fn delete_task(
     params: web::Path<TaskId>,
     req_user: Option<ReqData<TokenClaims>>,
-    pool: web::Data<PgPool>,
+    state: web::Data<AppState>,
 ) -> TaskResult<TaskId> {
     let user = req_user.ok_or(TaskError::InternalError)?.into_inner();
-    let mut transaction = pool.begin().await.map_err(|e| {
-        println!("begin: {:?}", e);
-        TaskError::InternalError
-    })?;
+    let pool = &state.db;
+    
     let id = sqlx::query_as!(
         TaskId,
         "DELETE FROM Tasks WHERE id = $1 
@@ -96,16 +81,13 @@ async fn delete_task(
         params.id,
         user.id
     )
-    .fetch_one(&mut transaction)
+    .fetch_one(pool)
     .await
     .map_err(|e| {
         println!("delete: {:?}", e);
         TaskError::InternalError
     })?;
-    transaction.commit().await.map_err(|e| {
-        println!("commit: {:?}", e);
-        TaskError::InternalError
-    })?;
+    
     Ok(Json(id))
 }
 use json_patch::{patch, Patch};

@@ -1,13 +1,14 @@
 use actix_web::{
-    web::{self, ReqData, Json},
-    Result, get, post, delete
+    delete, get, post,
+    web::{self, Json, ReqData},
+    Result,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool};
+use sqlx::FromRow;
 
-use crate::models::ProjectDbo;
-use crate::TokenClaims;
 use super::ProjectError;
+use crate::TokenClaims;
+use crate::{models::ProjectDbo, AppState};
 type ProjectResult<T> = Result<Json<T>, ProjectError>;
 
 #[derive(Deserialize)]
@@ -34,13 +35,11 @@ pub struct ProjectViewWithId {
 #[post("/project")]
 pub async fn create(
     req_user: Option<ReqData<TokenClaims>>,
-    pool: web::Data<PgPool>,
+    state: web::Data<AppState>,
     task: web::Json<CreateTask>,
 ) -> ProjectResult<ProjectId> {
-
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let mut transaction = pool.begin().await.map_err(|e| ProjectError::Database(e))?;
-    
+    let pool = &state.db;
     let uuid = uuid::Uuid::new_v4();
     let id = sqlx::query_as!(
         ProjectId,
@@ -49,77 +48,56 @@ pub async fn create(
         task.name,
         user.id
     )
-    .fetch_one(&mut transaction)
+    .fetch_one(pool)
     .await
     .map_err(|e| {
         println!("insert: {:?}", e);
         ProjectError::Database(e)
-    });
-    match id {
-        Ok(id) => {
-            transaction
-            .commit()
-            .await
-            .map_err(|e| {
-                println!("commit: {:?}", e);
-                ProjectError::Database(e)})?;
-            Ok(Json(id))
-        },
-        Err(e)=>{
-            transaction.rollback().await.map_err(|e| ProjectError::Database(e))?;
-            Err(e)
-        }
-    }
-
-    
+    })?;
+    Ok(Json(id))
 }
 
 #[get("/project/{id}")]
 pub async fn get(
     query: web::Path<ProjectId>,
     req_user: Option<ReqData<TokenClaims>>,
-    pool: web::Data<PgPool>,
+    state: web::Data<AppState>,
 ) -> ProjectResult<ProjectView> {
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let mut transaction = pool.begin().await.map_err(|e| ProjectError::Database(e))?;
+    let pool = &state.db;
     let project = sqlx::query_as!(
         ProjectDbo,
         "SELECT * FROM Projects where id = $1 AND owner_id = $2;",
         query.id,
         user.id
     )
-    .fetch_one(&mut transaction)
+    .fetch_one(pool)
     .await
     .map_err(|e| ProjectError::Database(e))?;
 
-    transaction
-        .commit()
-        .await
-        .map_err(|e| ProjectError::Database(e))?;
     Ok(Json(ProjectView { name: project.name }))
 }
 
 #[get("/project")]
 pub async fn get_all(
     req_user: Option<ReqData<TokenClaims>>,
-    pool: web::Data<PgPool>,
+    state: web::Data<AppState>,
 ) -> ProjectResult<Vec<ProjectViewWithId>> {
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let mut transaction = pool.begin().await.map_err(|e| ProjectError::Database(e))?;
+    let pool = &state.db;
     let projects = sqlx::query_as!(
         ProjectDbo,
         "SELECT * FROM Projects WHERE owner_id = $1",
         user.id
     )
-    .map(|p| ProjectViewWithId { id: p.id, name: p.name })
-    .fetch_all(&mut transaction)
+    .map(|p| ProjectViewWithId {
+        id: p.id,
+        name: p.name,
+    })
+    .fetch_all(pool)
     .await
     .map_err(|e| ProjectError::Database(e))?;
 
-    transaction
-        .commit()
-        .await
-        .map_err(|e| ProjectError::Database(e))?;
     Ok(Json(projects))
 }
 
@@ -127,10 +105,10 @@ pub async fn get_all(
 pub async fn delete(
     query: web::Path<ProjectId>,
     req_user: Option<ReqData<TokenClaims>>,
-    pool: web::Data<PgPool>,
+    state: web::Data<AppState>,
 ) -> ProjectResult<ProjectId> {
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let mut transaction = pool.begin().await.map_err(|e| ProjectError::Database(e))?;
+    let pool = &state.db;
 
     let id = sqlx::query_as!(
         ProjectId,
@@ -138,13 +116,9 @@ pub async fn delete(
         query.id,
         user.id
     )
-    .fetch_one(&mut transaction)
+    .fetch_one(pool)
     .await
     .map_err(|e| ProjectError::Database(e))?;
 
-    transaction
-        .commit()
-        .await
-        .map_err(|e| ProjectError::Database(e))?;
     Ok(Json(id))
 }

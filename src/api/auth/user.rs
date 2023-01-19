@@ -1,8 +1,9 @@
 use actix_web::{post, web, HttpResponse};
 use argonautica::Hasher;
 use serde::Deserialize;
-use sqlx::PgPool;
 use sqlx::types::Uuid;
+
+use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct Registration {
@@ -12,11 +13,11 @@ pub struct Registration {
 }
 
 #[post("/create_user")]
-async fn create_user(body: web::Json<Registration>, pool: web::Data<PgPool>) -> HttpResponse {
-    let mut transaction = pool.begin().await.unwrap();
+async fn create_user(body: web::Json<Registration>, state: web::Data<AppState>) -> HttpResponse {
+    let pool = &state.db;
     let row = sqlx::query("SELECT 1 FROM users where email = $1;")
         .bind(body.email.clone())
-        .fetch_optional(&mut transaction)
+        .fetch_optional(pool)
         .await
         .unwrap();
 
@@ -39,9 +40,9 @@ async fn create_user(body: web::Json<Registration>, pool: web::Data<PgPool>) -> 
     .bind(body.name.as_str())
     .bind(body.email.as_str())
     .bind(hash)
-    .fetch_one(&mut transaction)
+    .fetch_one(pool)
     .await
     .unwrap();
-    transaction.commit().await.unwrap();
+
     return HttpResponse::Ok().json(id);
 }
