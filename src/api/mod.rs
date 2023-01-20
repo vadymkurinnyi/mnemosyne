@@ -1,24 +1,20 @@
-pub mod task;
-pub mod errors;
-pub mod health;
-pub mod users;
+mod task;
+mod errors;
+mod health;
+mod users;
 pub mod auth;
 mod projects;
 
 use actix_web::web;
-pub use task::*;
-pub use errors::*;
-pub use health::*;
-pub use users::*;
-pub use auth::*;
+use users::*;
 
 pub fn  api_config(cfg: &mut web::ServiceConfig) {
     cfg
     .service(task::create)
     .service(task::get)
-    .service(delete_task)
-    .service(update_task)
-    .service(health_get)
+    .service(task::delete)
+    .service(task::update)
+    .service(health::get)
     .service(get_users)
     .service(projects::create)
     .service(projects::delete)

@@ -4,7 +4,7 @@ use serde_json::json;
 use sqlx::PgPool;
 
 #[get("/health")]
-pub async fn health_get(client: Data<PgPool>) -> HttpResponse {
+pub async fn get(client: Data<PgPool>) -> HttpResponse {
     // Check database connection:
     let result = test_database(client).await;
     if result.is_err() {

@@ -8,6 +8,7 @@ pub enum TaskError {
     NotFound,
     InvalidPatch,
     InternalError,
+    Database(sqlx::Error),
 }
 impl ResponseError for TaskError {
     fn status_code(&self) -> StatusCode {
@@ -15,6 +16,12 @@ impl ResponseError for TaskError {
             TaskError::NotFound => StatusCode::NOT_FOUND,
             TaskError::InvalidPatch => StatusCode::BAD_REQUEST,
             TaskError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            TaskError::Database(e) => {
+                if let sqlx::Error::Database(db_error) = e {
+                    warn!("{:#?}", db_error.message());
+                }
+                StatusCode::INTERNAL_SERVER_ERROR
+            },
         }
     }
 

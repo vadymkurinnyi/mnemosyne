@@ -18,6 +18,7 @@ pub struct AppState{
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenv::dotenv().expect("load .env");
     env_logger::init();
     let repos = actix_web::web::Data::new(repository::MemoryTaskRepos::new());
     let pool = create_pool().await.expect("Database connection failed");

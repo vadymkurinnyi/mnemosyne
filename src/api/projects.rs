@@ -3,12 +3,14 @@ use actix_web::{
     web::{self, Json, ReqData},
     Result,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-
-use super::ProjectError;
 use crate::TokenClaims;
+use crate::{api::errors::ProjectError, models::TaskDbo};
 use crate::{models::ProjectDbo, AppState};
+
+use super::task::TaskView;
 type ProjectResult<T> = Result<Json<T>, ProjectError>;
 
 #[derive(Deserialize)]
@@ -24,6 +26,7 @@ pub struct ProjectId {
 #[derive(Serialize)]
 pub struct ProjectView {
     name: String,
+    tasks: Vec<TaskView>,
 }
 
 #[derive(Serialize)]
@@ -56,26 +59,35 @@ pub async fn create(
     })?;
     Ok(Json(id))
 }
-
 #[get("/project/{id}")]
 pub async fn get(
-    query: web::Path<ProjectId>,
+    path: web::Path<ProjectId>,
     req_user: Option<ReqData<TokenClaims>>,
     state: web::Data<AppState>,
 ) -> ProjectResult<ProjectView> {
+    info!("{:#?}", &req_user);
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
     let pool = &state.db;
     let project = sqlx::query_as!(
         ProjectDbo,
         "SELECT * FROM Projects where id = $1 AND owner_id = $2;",
-        query.id,
+        path.id,
         user.id
     )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| ProjectError::Database(e))?;
+    .fetch_one(pool);
+    let tasks = sqlx::query_as!(
+        TaskDbo,
+        "SELECT * FROM Tasks where project_id = $1",
+        path.id
+    )
+    .fetch_all(pool);
 
-    Ok(Json(ProjectView { name: project.name }))
+    let result = tokio::try_join!(project, tasks);
+    let (project, tasks) = result.map_err(ProjectError::Database)?;
+    Ok(Json(ProjectView {
+        name: project.name,
+        tasks: tasks.into_iter().map(TaskView::from).collect(),
+    }))
 }
 
 #[get("/project")]
