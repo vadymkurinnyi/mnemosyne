@@ -5,15 +5,11 @@ use sqlx::{postgres::PgRow, Row};
 use crate::AppState;
 
 #[derive(Serialize)]
-struct UserId{
-    pub id: i32
-}
-
-#[derive(Serialize)]
 struct UserView{
     name: String,
     email: String
 }
+
 #[get("/user")]
 async fn get_users(
     state: web::Data<AppState>,

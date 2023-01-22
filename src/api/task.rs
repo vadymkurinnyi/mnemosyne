@@ -1,32 +1,21 @@
+use crate::abstractions::TaskRepository;
 use crate::api::errors::TaskError;
+use crate::app_config::State;
 use crate::models::task::TaskDbo;
-use crate::{AppState, TokenClaims};
+use crate::models::{CreateTask, TaskId, TaskView};
+use crate::TokenClaims;
 use actix_web::web::ReqData;
 use actix_web::{delete, get, patch, post, web, web::Json, Result};
-use log::{warn, info};
-use serde::{Deserialize, Serialize};
 use json_patch::{patch, Patch};
-use uuid::Uuid;
+use log::{info, warn};
 type TaskResult<T> = Result<Json<T>, TaskError>;
 
 #[post("/task")]
-async fn create(task: web::Json<CreateTask>, state: web::Data<AppState>) -> TaskResult<TaskId> {
+async fn create(task: web::Json<CreateTask>, state: web::Data<State>) -> TaskResult<TaskId> {
     let task = task.into_inner();
-    let pool = &state.db;
+    let repo = &state.task_repo;
 
-    let uuid = uuid::Uuid::new_v4();
-    let id = sqlx::query_as!(
-        TaskId,
-        "INSERT INTO Tasks(id, project_id, title, description, completed) VALUES($1,$2,$3,$4,$5) returning id;",
-        uuid,
-        task.project_id,
-        task.title,
-        task.description,
-        false
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
+    let id = repo.create(task).await.map_err(|e| {
         println!("insert: {:?}", e);
         TaskError::InternalError
     })?;
@@ -36,22 +25,14 @@ async fn create(task: web::Json<CreateTask>, state: web::Data<AppState>) -> Task
 
 #[get("/task/{id}")]
 pub async fn get(
-    query: web::Path<TaskId>,
+    path: web::Path<TaskId>,
     req_user: Option<ReqData<TokenClaims>>,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
 ) -> TaskResult<TaskView> {
     let user = req_user.ok_or(TaskError::InternalError)?.into_inner();
-    let pool = &state.db;
+    let repo = &state.task_repo;
 
-    let task = sqlx::query_as!(
-        TaskDbo,
-        "SELECT * FROM Tasks where id = $1 AND project_id IN (SELECT id FROM Projects WHERE owner_id = $2);",
-        query.id,
-        user.id
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
+    let task = repo.get(user.id, path.into_inner()).await.map_err(|e| {
         println!("select: {:?}", e);
         TaskError::InternalError
     })?;
@@ -61,50 +42,33 @@ pub async fn get(
 
 #[delete("/task/{id}")]
 async fn delete(
-    params: web::Path<TaskId>,
+    path: web::Path<TaskId>,
     req_user: Option<ReqData<TokenClaims>>,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
 ) -> TaskResult<TaskId> {
     let user = req_user.ok_or(TaskError::InternalError)?.into_inner();
-    let pool = &state.db;
+    let repo = &state.task_repo;
 
-    let id = sqlx::query_as!(
-        TaskId,
-        "DELETE FROM Tasks WHERE id = $1 
-        AND project_id IN (SELECT id FROM Projects WHERE owner_id = $2)
-        returning id;",
-        params.id,
-        user.id
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
+    let id = path.id;
+    repo.remove(user.id, path.into_inner()).await.map_err(|e| {
         println!("delete: {:?}", e);
         TaskError::InternalError
     })?;
 
-    Ok(Json(id))
+    Ok(Json(TaskId::from(id)))
 }
 
 #[patch("/task/{id}")]
 async fn update(
     params: web::Path<TaskId>,
     pth: web::Json<Patch>,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
     req_user: Option<ReqData<TokenClaims>>,
 ) -> TaskResult<TaskId> {
     let user = req_user.ok_or(TaskError::InternalError)?.into_inner();
-    let pool = &state.db;
+    let repo = &state.task_repo;
     let uuid = params.id;
-    let task = sqlx::query_as!(
-            TaskDbo,
-        "SELECT * FROM Tasks where id = $1 AND project_id IN (SELECT id FROM Projects WHERE owner_id = $2);",
-        params.id,
-        user.id
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
+    let task = repo.get(user.id, params.into_inner()).await.map_err(|e| {
         println!("select: {:?}", e);
         TaskError::InternalError
     })?;
@@ -122,11 +86,7 @@ async fn update(
         warn!("{e}");
         TaskError::InvalidPatch
     })?;
-    let update = updated.get_update(old).ok_or(TaskError::InvalidPatch)?;
-    let sql = &format!("Update Tasks {} WHERE id = '{}'", update, params.id);
-    info!("{}", sql);
-    sqlx::query(sql)
-        .execute(pool)
+    repo.update(updated, Some(old))
         .await
         .map_err(|e| {
             println!("update: {:?}", e);
@@ -134,38 +94,4 @@ async fn update(
         })?;
 
     Ok(Json(TaskId::from(uuid)))
-}
-
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateTask {
-    pub project_id: Uuid,
-    pub title: String,
-    pub description: String,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct TaskId {
-    id: Uuid,
-}
-impl From<Uuid> for TaskId {
-    fn from(value: Uuid) -> Self {
-        TaskId { id: value }
-    }
-}
-#[derive(Serialize)]
-pub struct TaskView {
-    id: Uuid,
-    title: String,
-    description: String,
-}
-
-impl From<TaskDbo> for TaskView {
-    fn from(value: TaskDbo) -> Self {
-        TaskView {
-            id: value.id,
-            title: value.title,
-            description: value.description,
-        }
-    }
 }

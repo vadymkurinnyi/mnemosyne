@@ -1,45 +1,23 @@
+use crate::{api::errors::ProjectError, models::TaskDbo};
+use crate::{models::ProjectDbo, AppState};
+use crate::{
+    models::{CreateProject, ProjectId, ProjectView, ProjectViewWithId, TaskView},
+    TokenClaims,
+};
 use actix_web::{
     delete, get, post,
     web::{self, Json, ReqData},
     Result,
 };
 use log::info;
-use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
-use crate::TokenClaims;
-use crate::{api::errors::ProjectError, models::TaskDbo};
-use crate::{models::ProjectDbo, AppState};
 
-use super::task::TaskView;
 type ProjectResult<T> = Result<Json<T>, ProjectError>;
-
-#[derive(Deserialize)]
-pub struct CreateTask {
-    name: String,
-}
-
-#[derive(FromRow, Serialize, Deserialize)]
-pub struct ProjectId {
-    id: uuid::Uuid,
-}
-
-#[derive(Serialize)]
-pub struct ProjectView {
-    name: String,
-    tasks: Vec<TaskView>,
-}
-
-#[derive(Serialize)]
-pub struct ProjectViewWithId {
-    id: uuid::Uuid,
-    name: String,
-}
 
 #[post("/project")]
 pub async fn create(
     req_user: Option<ReqData<TokenClaims>>,
     state: web::Data<AppState>,
-    task: web::Json<CreateTask>,
+    proj: web::Json<CreateProject>,
 ) -> ProjectResult<ProjectId> {
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
     let pool = &state.db;
@@ -48,7 +26,7 @@ pub async fn create(
         ProjectId,
         "INSERT INTO projects(id, name, owner_id) VALUES($1,$2,$3) returning id;",
         uuid,
-        task.name,
+        proj.name,
         user.id
     )
     .fetch_one(pool)
