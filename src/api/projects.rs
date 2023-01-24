@@ -1,39 +1,31 @@
-use crate::{api::errors::ProjectError, models::TaskDbo};
-use crate::{models::ProjectDbo, AppState};
+use crate::abstractions::{ProjectRepository, TaskRepository};
+use crate::api::errors::ProjectError;
+use crate::app_config::State;
+use crate::models::TokenClaims;
 use crate::{
     models::{CreateProject, ProjectId, ProjectView, ProjectViewWithId, TaskView},
-    TokenClaims,
+    // TokenClaims,
 };
 use actix_web::{
     delete, get, post,
     web::{self, Json, ReqData},
     Result,
 };
-use log::info;
+use log::warn;
 
 type ProjectResult<T> = Result<Json<T>, ProjectError>;
 
 #[post("/project")]
 pub async fn create(
     req_user: Option<ReqData<TokenClaims>>,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
     proj: web::Json<CreateProject>,
 ) -> ProjectResult<ProjectId> {
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let pool = &state.db;
-    let uuid = uuid::Uuid::new_v4();
-    let id = sqlx::query_as!(
-        ProjectId,
-        "INSERT INTO projects(id, name, owner_id) VALUES($1,$2,$3) returning id;",
-        uuid,
-        proj.name,
-        user.id
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| {
-        println!("insert: {:?}", e);
-        ProjectError::Database(e)
+    let repo = &state.project_repo;
+    let id = repo.create(user.id, proj.into_inner()).await.map_err(|e| {
+        warn!("insert: {:?}", e);
+        ProjectError::InternalError
     })?;
     Ok(Json(id))
 }
@@ -41,27 +33,15 @@ pub async fn create(
 pub async fn get(
     path: web::Path<ProjectId>,
     req_user: Option<ReqData<TokenClaims>>,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
 ) -> ProjectResult<ProjectView> {
-    info!("{:#?}", &req_user);
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let pool = &state.db;
-    let project = sqlx::query_as!(
-        ProjectDbo,
-        "SELECT * FROM Projects where id = $1 AND owner_id = $2;",
-        path.id,
-        user.id
-    )
-    .fetch_one(pool);
-    let tasks = sqlx::query_as!(
-        TaskDbo,
-        "SELECT * FROM Tasks where project_id = $1",
-        path.id
-    )
-    .fetch_all(pool);
+    let proj_id = path.into_inner();
+    let project = state.project_repo.get(user.id, proj_id);
+    let tasks = state.task_repo.get_by_proj(user.id, proj_id);
 
     let result = tokio::try_join!(project, tasks);
-    let (project, tasks) = result.map_err(ProjectError::Database)?;
+    let (project, tasks) = result.map_err(|_| ProjectError::InternalError)?;
     Ok(Json(ProjectView {
         name: project.name,
         tasks: tasks.into_iter().map(TaskView::from).collect(),
@@ -71,44 +51,39 @@ pub async fn get(
 #[get("/project")]
 pub async fn get_all(
     req_user: Option<ReqData<TokenClaims>>,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
 ) -> ProjectResult<Vec<ProjectViewWithId>> {
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let pool = &state.db;
-    let projects = sqlx::query_as!(
-        ProjectDbo,
-        "SELECT * FROM Projects WHERE owner_id = $1",
-        user.id
-    )
-    .map(|p| ProjectViewWithId {
-        id: p.id,
-        name: p.name,
-    })
-    .fetch_all(pool)
-    .await
-    .map_err(|e| ProjectError::Database(e))?;
+    let projects = state
+        .project_repo
+        .get_all(user.id)
+        .await
+        .map_err(|_| ProjectError::InternalError)?
+        .into_iter()
+        .map(|p| ProjectViewWithId {
+            id: p.id,
+            name: p.name,
+        })
+        .collect();
 
     Ok(Json(projects))
 }
 
 #[delete("/project/{id}")]
 pub async fn delete(
-    query: web::Path<ProjectId>,
+    path: web::Path<ProjectId>,
     req_user: Option<ReqData<TokenClaims>>,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
 ) -> ProjectResult<ProjectId> {
     let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
-    let pool = &state.db;
+    let proj_id = path.into_inner();
+    state
+        .project_repo
+        .remove(user.id, proj_id)
+        .await
+        .map_err(|e| {
+            println!("{e}");
+            ProjectError::InternalError})?;
 
-    let id = sqlx::query_as!(
-        ProjectId,
-        "DELETE FROM Projects WHERE id = $1 AND owner_id = $2 returning id;",
-        query.id,
-        user.id
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| ProjectError::Database(e))?;
-
-    Ok(Json(id))
+    Ok(Json(proj_id))
 }

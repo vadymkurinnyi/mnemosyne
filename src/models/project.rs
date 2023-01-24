@@ -24,7 +24,7 @@ pub struct CreateProject {
     pub name: String,
 }
 
-#[derive(FromRow, Serialize, Deserialize)]
+#[derive(FromRow, Serialize, Deserialize, Clone, Copy)]
 pub struct ProjectId {
     pub id: uuid::Uuid,
 }

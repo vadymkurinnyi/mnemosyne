@@ -1,13 +1,11 @@
 use crate::abstractions::TaskRepository;
 use crate::api::errors::TaskError;
 use crate::app_config::State;
-use crate::models::task::TaskDbo;
-use crate::models::{CreateTask, TaskId, TaskView};
-use crate::TokenClaims;
+use crate::models::*;
 use actix_web::web::ReqData;
 use actix_web::{delete, get, patch, post, web, web::Json, Result};
 use json_patch::{patch, Patch};
-use log::{info, warn};
+use log::warn;
 type TaskResult<T> = Result<Json<T>, TaskError>;
 
 #[post("/task")]
@@ -16,7 +14,7 @@ async fn create(task: web::Json<CreateTask>, state: web::Data<State>) -> TaskRes
     let repo = &state.task_repo;
 
     let id = repo.create(task).await.map_err(|e| {
-        println!("insert: {:?}", e);
+        warn!("insert: {:?}", e);
         TaskError::InternalError
     })?;
 
@@ -33,7 +31,7 @@ pub async fn get(
     let repo = &state.task_repo;
 
     let task = repo.get(user.id, path.into_inner()).await.map_err(|e| {
-        println!("select: {:?}", e);
+        warn!("select: {:?}", e);
         TaskError::InternalError
     })?;
 
@@ -51,7 +49,7 @@ async fn delete(
 
     let id = path.id;
     repo.remove(user.id, path.into_inner()).await.map_err(|e| {
-        println!("delete: {:?}", e);
+        warn!("delete: {:?}", e);
         TaskError::InternalError
     })?;
 
@@ -69,7 +67,7 @@ async fn update(
     let repo = &state.task_repo;
     let uuid = params.id;
     let task = repo.get(user.id, params.into_inner()).await.map_err(|e| {
-        println!("select: {:?}", e);
+        warn!("select: {:?}", e);
         TaskError::InternalError
     })?;
     let old = task.clone();

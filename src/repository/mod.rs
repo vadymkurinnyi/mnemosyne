@@ -1,6 +1,7 @@
 mod objects;
 mod task;
 mod project;
+mod user;
 use log::info;
 
 use sqlx::migrate::MigrateDatabase;
@@ -8,6 +9,7 @@ use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::{Connection, PgConnection, Postgres};
 pub use task::*;
 pub use project::SqlxProjectRepository;
+pub use user::SqlxUserRepository;
 
 pub async fn create_pool() -> Result<PgPool, sqlx::Error> {
     let url = dotenvy::var("DATABASE_URL").expect("'DATABASE_URL' is not specified");

@@ -2,7 +2,6 @@ mod task;
 mod errors;
 mod health;
 mod users;
-pub mod auth;
 mod projects;
 
 use actix_web::web;

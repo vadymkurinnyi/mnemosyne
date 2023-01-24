@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::abstractions::TaskRepository;
 use crate::abstractions::UserId;
+use crate::models::ProjectId;
 use crate::models::{CreateTask, TaskDbo, TaskId};
 type Result<T> = std::result::Result<T, Error>;
 
@@ -17,9 +18,11 @@ impl SqlxTaskRepository {
         Self { db }
     }
 }
-impl Clone for SqlxTaskRepository{
+impl Clone for SqlxTaskRepository {
     fn clone(&self) -> Self {
-        Self { db: self.db.clone() }
+        Self {
+            db: self.db.clone(),
+        }
     }
 }
 
@@ -51,6 +54,14 @@ impl TaskRepository for SqlxTaskRepository {
     .fetch_one(&self.db)
     .await?;
         Ok(task)
+    }
+    async fn get_by_proj(&self, user_id: UserId, proj: ProjectId) -> Result<Vec<TaskDbo>>{
+        let tasks = sqlx::query_as!(
+            TaskDbo,
+            "SELECT * FROM Tasks where project_id = $1",
+            proj.id
+        ).fetch_all(&self.db).await?;
+        Ok(tasks)
     }
     async fn remove(&self, user_id: UserId, id: TaskId) -> Result<()> {
         let id = Into::<Uuid>::into(id);
