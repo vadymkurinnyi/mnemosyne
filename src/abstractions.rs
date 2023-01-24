@@ -1,4 +1,4 @@
-use crate::models::*;
+use crate::{models::*, auth::AuthError};
 use anyhow::Error;
 use async_trait::async_trait;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -14,9 +14,9 @@ pub trait UserRepository {
 
 #[async_trait]
 pub trait AuthService {
-    async fn register(&self, credential: &Registration) -> Result<UserId>;
-    async fn login(&self, credential: &Credential) -> Result<Token>;
-    async fn authenticate(&self, token: Token) -> Result<TokenClaims>;
+    async fn register(&self, credential: &Registration) -> std::result::Result<UserId, AuthError>;
+    async fn login(&self, credential: &Credential) -> std::result::Result<Token, AuthError>;
+    async fn authenticate(&self, token: Token) -> std::result::Result<TokenClaims, AuthError>;
 }
 
 #[async_trait]
@@ -49,12 +49,12 @@ pub trait Config {
     type ProjectRepo: ProjectRepository + Sync + Send;
 }
 
-pub struct AppState1<T: Config> {
+pub struct AppState<T: Config> {
     pub task_repo: T::TaskRepo,
     pub project_repo: T::ProjectRepo,
 }
 
-impl<T> AppState1<T>
+impl<T> AppState<T>
 where
     T: Config,
 {

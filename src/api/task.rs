@@ -8,7 +8,17 @@ use json_patch::{patch, Patch};
 use log::warn;
 type TaskResult<T> = Result<Json<T>, TaskError>;
 
-#[post("/task")]
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/task")
+            .service(create)
+            .service(get)
+            .service(delete)
+            .service(update),
+    );
+}
+
+#[post("")]
 async fn create(task: web::Json<CreateTask>, state: web::Data<State>) -> TaskResult<TaskId> {
     let task = task.into_inner();
     let repo = &state.task_repo;
@@ -21,7 +31,7 @@ async fn create(task: web::Json<CreateTask>, state: web::Data<State>) -> TaskRes
     Ok(Json(TaskId::from(id)))
 }
 
-#[get("/task/{id}")]
+#[get("/{id}")]
 pub async fn get(
     path: web::Path<TaskId>,
     req_user: Option<ReqData<TokenClaims>>,
@@ -38,7 +48,7 @@ pub async fn get(
     Ok(Json(TaskView::from(task)))
 }
 
-#[delete("/task/{id}")]
+#[delete("/{id}")]
 async fn delete(
     path: web::Path<TaskId>,
     req_user: Option<ReqData<TokenClaims>>,
@@ -56,7 +66,7 @@ async fn delete(
     Ok(Json(TaskId::from(id)))
 }
 
-#[patch("/task/{id}")]
+#[patch("/{id}")]
 async fn update(
     params: web::Path<TaskId>,
     pth: web::Json<Patch>,

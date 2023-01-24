@@ -1,23 +1,20 @@
-pub mod abstractions;
-pub mod api;
-pub mod app_config;
-pub mod models;
-pub mod repository;
-pub mod services;
+mod abstractions;
+mod api;
+mod app_config;
 mod auth;
+mod models;
+mod repository;
+mod services;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use api::*;
 use models::{
-    abstractions::{AppState1},
+    abstractions::AppState,
     app_config::AppConfig,
     repository::{SqlxProjectRepository, SqlxTaskRepository, SqlxUserRepository},
     services::auth_service::AuthServiceImpl,
 };
 use repository::create_pool;
 use sqlx::PgPool;
-pub struct AppState {
-    pub db: PgPool,
-}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -33,12 +30,6 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(logger)
             .configure(|cfg| configure_features(pool.clone(), cfg))
-            .app_data(web::Data::new(AppState1::<AppConfig>::new(
-                SqlxTaskRepository::new(pool.clone()),
-                SqlxProjectRepository::new(pool.clone()),
-            )))
-            .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(AppState { db: pool.clone() }))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
@@ -46,14 +37,19 @@ async fn main() -> std::io::Result<()> {
 }
 
 fn configure_features(pg_pool: PgPool, cfg: &mut web::ServiceConfig) {
-    configure_auth(pg_pool.clone(), cfg);
+    let api = api_config;
+    configure_auth(pg_pool.clone(), cfg, api);
+    cfg.app_data(web::Data::new(AppState::<AppConfig>::new(
+        SqlxTaskRepository::new(pg_pool.clone()),
+        SqlxProjectRepository::new(pg_pool),
+    )));
 }
 
-fn configure_auth(pg_pool: PgPool, cfg: &mut web::ServiceConfig) {
+fn configure_auth(pg_pool: PgPool, cfg: &mut web::ServiceConfig, f: fn(&mut web::ServiceConfig)) {
     let auth_service = AuthServiceImpl::<AppConfig> {
         user_repo: SqlxUserRepository {
             db: pg_pool.clone(),
         },
     };
-    auth::configure(web::Data::new(auth_service), cfg, api_config);
+    auth::configure(web::Data::new(auth_service), cfg, f);
 }

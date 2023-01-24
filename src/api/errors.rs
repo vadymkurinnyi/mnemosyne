@@ -21,7 +21,7 @@ impl ResponseError for TaskError {
                     warn!("{:#?}", db_error.message());
                 }
                 StatusCode::INTERNAL_SERVER_ERROR
-            },
+            }
         }
     }
 

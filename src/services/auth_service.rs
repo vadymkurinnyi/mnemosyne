@@ -1,14 +1,13 @@
 use crate::{
-    abstractions::{AuthService, Config, Result, Token, UserId, UserRepository},
-    models::{Credential, Registration, UserInfo, TokenClaims},
-    // TokenClaims,
+    abstractions::{AuthService, Config, Token, UserId, UserRepository},
+    auth::AuthError,
+    models::{Credential, Registration, TokenClaims, UserInfo},
 };
-use anyhow::anyhow;
 use argonautica::{Hasher, Verifier};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header, decode, DecodingKey, Validation};
-
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+pub type Result<T> = std::result::Result<T, AuthError>;
 pub struct AuthServiceImpl<T: Config> {
     pub user_repo: <T as Config>::UserRepo,
 }
@@ -20,10 +19,14 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             email: credential.email.clone(),
             password: credential.password.clone(),
         };
-        let is_exist = self.user_repo.is_exist(&cred).await?;
+        let is_exist = self
+            .user_repo
+            .is_exist(&cred)
+            .await
+            .map_err(|e| AuthError::InternalError(e.to_string()))?;
 
         if is_exist {
-            return Err(anyhow!("already exists"));
+            return Err(AuthError::UserAlreadyExist(cred.email.to_owned()));
         }
         let hash_secret = std::env::var("HASH_SECRET").expect("HASH_SECRET not specified");
         let mut hasher = Hasher::default();
@@ -40,10 +43,15 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
                 passhash: hash,
             })
             .await
+            .map_err(|e| AuthError::InternalError(e.to_string()))
     }
     async fn login(&self, credential: &Credential) -> Result<Token> {
         let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not specified");
-        let auth_info = self.user_repo.get_auth_info(&credential.email).await?;
+        let auth_info = self
+            .user_repo
+            .get_auth_info(&credential.email)
+            .await
+            .map_err(|e| AuthError::InternalError(e.to_string()))?;
 
         let hash_secret = std::env::var("HASH_SECRET").expect("HASH_SECRET not specified");
         let mut verifier = Verifier::default();
@@ -52,9 +60,9 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             .with_password(credential.password.as_str())
             .with_secret_key(hash_secret)
             .verify()
-            .map_err(|e| anyhow!(e.kind()))?;
-        if !is_valid{
-            return Err(anyhow!("password is not valid"));
+            .map_err(|e| AuthError::IncorrectPassword)?;
+        if !is_valid {
+            return Err(AuthError::IncorrectPassword);
         }
         let expiration = Utc::now()
             .checked_add_signed(*TOKEN_EXPIRATION)
@@ -69,7 +77,8 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             &Header::default(),
             &claims,
             &EncodingKey::from_secret(jwt_secret.as_ref()),
-        )?;
+        )
+        .map_err(|_| AuthError::EncodeToken)?;
         Ok(token)
     }
     async fn authenticate(&self, token: Token) -> Result<TokenClaims> {
@@ -78,7 +87,8 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             token.as_str(),
             &DecodingKey::from_secret(jwt_secret.as_ref()),
             &Validation::default(),
-        )?;
+        )
+        .map_err(|_| AuthError::DecodeToken)?;
         Ok(token.claims)
     }
 }

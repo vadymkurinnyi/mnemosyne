@@ -1,4 +1,3 @@
-mod objects;
 mod task;
 mod project;
 mod user;

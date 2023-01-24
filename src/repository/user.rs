@@ -4,7 +4,7 @@ use sqlx::PgPool;
 
 use crate::{
     abstractions::{UserId, UserRepository},
-    models::{Credential, UserInfo, AuthUser},
+    models::{AuthUser, Credential, UserInfo},
 };
 type Result<T> = std::result::Result<T, Error>;
 pub struct SqlxUserRepository {
@@ -36,9 +36,19 @@ impl UserRepository for SqlxUserRepository {
             .map(|row| row.is_some())?;
         Ok(is_exist)
     }
-    async fn get_auth_info(&self, email: &str) -> Result<AuthUser>{
-        Ok(sqlx::query_as!(AuthUser,"SELECT id, passhash FROM users where email = $1;", email)
+    async fn get_auth_info(&self, email: &str) -> Result<AuthUser> {
+        Ok(sqlx::query_as!(
+            AuthUser,
+            "SELECT id, passhash FROM users where email = $1;",
+            email
+        )
         .fetch_one(&self.db)
         .await?)
+    }
+}
+use crate::auth::AuthError;
+impl From<sqlx::Error> for AuthError {
+    fn from(value: sqlx::Error) -> Self {
+        AuthError::InternalError(value.to_string())
     }
 }
