@@ -1,7 +1,6 @@
-use crate::{models::*, auth::AuthError};
-use anyhow::Error;
+use crate::models::*;
 use async_trait::async_trait;
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = anyhow::Result<T>;
 pub type UserId = uuid::Uuid;
 pub type Token = String;
 
@@ -11,12 +10,27 @@ pub trait UserRepository {
     async fn is_exist(&self, credentials: &Credential) -> Result<bool>;
     async fn get_auth_info(&self, email: &str) -> Result<AuthUser>;
 }
-
 #[async_trait]
 pub trait AuthService {
-    async fn register(&self, credential: &Registration) -> std::result::Result<UserId, AuthError>;
-    async fn login(&self, credential: &Credential) -> std::result::Result<Token, AuthError>;
-    async fn authenticate(&self, token: Token) -> std::result::Result<TokenClaims, AuthError>;
+    type UserId: Clone + Copy + Eq + Ord + PartialEq + PartialOrd;
+    type Error: std::error::Error;
+    type Registration;
+    type Credential;
+    type Token: ToString;
+    type TokenClaims;
+
+    async fn register(
+        &self,
+        credential: &Self::Registration,
+    ) -> std::result::Result<Self::UserId, Self::Error>;
+    async fn login(
+        &self,
+        credential: &Self::Credential,
+    ) -> std::result::Result<Self::Token, Self::Error>;
+    async fn authenticate(
+        &self,
+        token: Self::Token,
+    ) -> std::result::Result<Self::TokenClaims, Self::Error>;
 }
 
 #[async_trait]

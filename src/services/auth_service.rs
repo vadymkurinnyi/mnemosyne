@@ -1,5 +1,5 @@
 use crate::{
-    abstractions::{AuthService, Config, Token, UserId, UserRepository},
+    abstractions::{AuthService, Config, Token, UserRepository},
     auth::AuthError,
     models::{Credential, Registration, TokenClaims, UserInfo},
 };
@@ -12,7 +12,14 @@ pub struct AuthServiceImpl<T: Config> {
 
 #[async_trait]
 impl<T: Config> AuthService for AuthServiceImpl<T> {
-    async fn register(&self, credential: &Registration) -> Result<UserId> {
+    type UserId = uuid::Uuid;
+    type Error = AuthError;
+    type Registration = Registration;
+    type Credential = Credential;
+    type Token = String;
+    type TokenClaims = TokenClaims;
+
+    async fn register(&self, credential: &Self::Registration) -> Result<Self::UserId> {
         let cred = Credential {
             email: credential.email.clone(),
             password: credential.password.clone(),

@@ -1,21 +1,33 @@
 use crate::{
-    abstractions::{AuthService, UserId},
-    models::{AuthToken, Credential, Registration},
+    abstractions::AuthService,
+    models::{AuthToken, Credential},
 };
 use actix_web::web::{self, Json};
-type AuthResonse<T> = Result<Json<T>, AuthError>;
+type AuthResonse<T, E> = Result<Json<T>, E>;
 
-pub fn configure<T: 'static + AuthService>(
+pub fn configure<T, E, R, I>(
     service: web::Data<T>,
     cfg: &mut web::ServiceConfig,
     f: fn(&mut web::ServiceConfig),
-) {
+) where
+    T: 'static
+        + AuthService<
+            Error = E,
+            Token = String,
+            Credential = Credential,
+            Registration = R,
+            UserId = I,
+        >,
+    E: 'static + ResponseError,
+    R: 'static + DeserializeOwned,
+    I: 'static + Serialize,
+{
     cfg.app_data(service);
-    cfg.route("/create_user", web::post().to(register::<T>));
+    cfg.route("/create_user", web::post().to(register::<T, E, I>));
     cfg.route("/auth", web::get().to(login::<T>));
     use_middleware::<T>(cfg, f);
 }
-fn use_middleware<T: 'static + AuthService>(
+fn use_middleware<T: 'static + AuthService<Token = String>>(
     cfg: &mut web::ServiceConfig,
     f: fn(&mut web::ServiceConfig),
 ) {
@@ -23,18 +35,23 @@ fn use_middleware<T: 'static + AuthService>(
     let bearer_middleware = HttpAuthentication::bearer(authenticate::<T>);
     cfg.service(web::scope("").wrap(bearer_middleware).configure(f));
 }
-async fn register<T: AuthService>(
+async fn register<T, E, I>(
     service: web::Data<T>,
-    body: Json<Registration>,
-) -> AuthResonse<UserId> {
+    body: Json<T::Registration>,
+) -> AuthResonse<T::UserId, T::Error>
+where
+    T: AuthService<Error = E, UserId = I>,
+    E: ResponseError,
+    I: Serialize,
+{
     Ok(Json(service.register(&body).await?))
 }
 
 use actix_web_httpauth::extractors::basic::BasicAuth;
-async fn login<T: AuthService>(
+async fn login<T: AuthService<Credential = Credential>>(
     service: web::Data<T>,
     credentials: BasicAuth,
-) -> AuthResonse<AuthToken> {
+) -> AuthResonse<AuthToken, AuthError> {
     let email = credentials.user_id().to_string();
     let password = credentials
         .password()
@@ -47,14 +64,14 @@ async fn login<T: AuthService>(
         .await
         .map_err(|_| AuthError::IncorrectCredential)?;
     Ok(Json(AuthToken {
-        bearer_token: token,
+        bearer_token: token.to_string(),
     }))
 }
 
 use actix_web::dev::ServiceRequest;
 use actix_web::Error;
 use actix_web_httpauth::extractors::bearer::{BearerAuth, Config};
-async fn authenticate<T: 'static + AuthService>(
+async fn authenticate<T: 'static + AuthService<Token = String>>(
     req: ServiceRequest,
     credetional: BearerAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
@@ -66,7 +83,7 @@ async fn authenticate<T: 'static + AuthService>(
         .app_data::<web::Data<T>>()
         .expect("AuthService not found");
 
-    let token = service.authenticate(token_string.to_string()).await;
+    let token = service.authenticate(token_string.into()).await;
     match token {
         Ok(token) => {
             req.extensions_mut().insert(token);
@@ -101,7 +118,7 @@ pub enum AuthError {
     #[error("Problem to decode password")]
     DecodeToken,
 }
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 #[derive(Serialize)]
 struct ErrorResponse<'a> {
     pub reason: &'a str,

@@ -55,12 +55,14 @@ impl TaskRepository for SqlxTaskRepository {
     .await?;
         Ok(task)
     }
-    async fn get_by_proj(&self, user_id: UserId, proj: ProjectId) -> Result<Vec<TaskDbo>>{
+    async fn get_by_proj(&self, _user_id: UserId, proj: ProjectId) -> Result<Vec<TaskDbo>> {
         let tasks = sqlx::query_as!(
             TaskDbo,
             "SELECT * FROM Tasks where project_id = $1",
             proj.id
-        ).fetch_all(&self.db).await?;
+        )
+        .fetch_all(&self.db)
+        .await?;
         Ok(tasks)
     }
     async fn remove(&self, user_id: UserId, id: TaskId) -> Result<()> {
