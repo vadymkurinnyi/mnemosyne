@@ -37,7 +37,6 @@ pub enum ProjectError {
     NotFound,
     InvalidPatch,
     InternalError,
-    Database(sqlx::Error),
 }
 
 impl ResponseError for ProjectError {
@@ -46,7 +45,6 @@ impl ResponseError for ProjectError {
             ProjectError::NotFound => StatusCode::NOT_FOUND,
             ProjectError::InvalidPatch => StatusCode::BAD_REQUEST,
             ProjectError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
-            ProjectError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -55,12 +53,6 @@ impl ResponseError for ProjectError {
             ProjectError::NotFound => ErrorResponse::new("Project not found"),
             ProjectError::InvalidPatch => ErrorResponse::new("Invalid patch"),
             ProjectError::InternalError => ErrorResponse::new("Internal error"),
-            ProjectError::Database(e) => {
-                if let sqlx::Error::Database(db_error) = e {
-                    warn!("{:#?}", db_error.message());
-                }
-                ErrorResponse::new("Internal error")
-            }
         };
         HttpResponse::build(self.status_code()).json(body)
     }

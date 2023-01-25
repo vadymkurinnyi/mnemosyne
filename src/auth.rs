@@ -73,6 +73,7 @@ async fn authenticate<T: 'static + AuthService>(
             Ok(req)
         }
         Err(e) => {
+            log::error!("{}", e.to_string());
             let config = req
                 .app_data::<Config>()
                 .cloned()

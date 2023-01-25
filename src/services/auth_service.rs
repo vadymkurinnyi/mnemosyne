@@ -3,10 +3,8 @@ use crate::{
     auth::AuthError,
     models::{Credential, Registration, TokenClaims, UserInfo},
 };
-use argonautica::{Hasher, Verifier};
+
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 pub type Result<T> = std::result::Result<T, AuthError>;
 pub struct AuthServiceImpl<T: Config> {
     pub user_repo: <T as Config>::UserRepo,
@@ -29,7 +27,7 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             return Err(AuthError::UserAlreadyExist(cred.email.to_owned()));
         }
         let hash_secret = std::env::var("HASH_SECRET").expect("HASH_SECRET not specified");
-        let mut hasher = Hasher::default();
+        let mut hasher = argonautica::Hasher::default();
         let hash = hasher
             .with_password(credential.password.clone())
             .with_secret_key(hash_secret)
@@ -54,17 +52,17 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             .map_err(|e| AuthError::InternalError(e.to_string()))?;
 
         let hash_secret = std::env::var("HASH_SECRET").expect("HASH_SECRET not specified");
-        let mut verifier = Verifier::default();
+        let mut verifier = argonautica::Verifier::default();
         let is_valid = verifier
             .with_hash(auth_info.passhash)
             .with_password(credential.password.as_str())
             .with_secret_key(hash_secret)
             .verify()
-            .map_err(|e| AuthError::IncorrectPassword)?;
+            .map_err(|_| AuthError::IncorrectPassword)?;
         if !is_valid {
             return Err(AuthError::IncorrectPassword);
         }
-        let expiration = Utc::now()
+        let expiration = chrono::Utc::now()
             .checked_add_signed(*TOKEN_EXPIRATION)
             .expect("failed to create an expiration time")
             .timestamp();
@@ -72,7 +70,7 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             id: auth_info.id,
             exp: expiration as usize,
         };
-
+        use jsonwebtoken::{encode, EncodingKey, Header};
         let token = encode(
             &Header::default(),
             &claims,
@@ -81,8 +79,11 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
         .map_err(|_| AuthError::EncodeToken)?;
         Ok(token)
     }
+
     async fn authenticate(&self, token: Token) -> Result<TokenClaims> {
         let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not specified");
+
+        use jsonwebtoken::{decode, DecodingKey, Validation};
         let token = decode::<TokenClaims>(
             token.as_str(),
             &DecodingKey::from_secret(jwt_secret.as_ref()),
@@ -92,6 +93,8 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
         Ok(token.claims)
     }
 }
+
+use chrono::Duration;
 lazy_static::lazy_static! {
     static ref TOKEN_EXPIRATION: Duration = Duration::minutes(60);
 }

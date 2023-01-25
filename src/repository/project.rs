@@ -45,7 +45,7 @@ impl ProjectRepository for SqlxProjectRepository {
         .await?;
         Ok(proj)
     }
-    async fn get_all(&self, user_id: UserId) -> Result<Vec<ProjectDbo>>{
+    async fn get_all(&self, user_id: UserId) -> Result<Vec<ProjectDbo>> {
         let pool = &self.db;
         let projects = sqlx::query_as!(
             ProjectDbo,
@@ -71,7 +71,7 @@ impl ProjectRepository for SqlxProjectRepository {
     }
     async fn update(
         &self,
-        user_id: UserId,
+        _user_id: UserId,
         proj: ProjectDbo,
         old: Option<ProjectDbo>,
     ) -> Result<()> {

@@ -2,10 +2,7 @@ use crate::abstractions::{ProjectRepository, TaskRepository};
 use crate::api::errors::ProjectError;
 use crate::app_config::State;
 use crate::models::TokenClaims;
-use crate::{
-    models::{CreateProject, ProjectId, ProjectView, ProjectViewWithId, TaskView},
-    // TokenClaims,
-};
+use crate::models::{CreateProject, ProjectId, ProjectView, ProjectViewWithId, TaskView};
 use actix_web::{
     delete, get, post,
     web::{self, Json, ReqData},
@@ -15,7 +12,17 @@ use log::warn;
 
 type ProjectResult<T> = Result<Json<T>, ProjectError>;
 
-#[post("/project")]
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/project")
+            .service(create)
+            .service(get)
+            .service(delete)
+            .service(get_all),
+    );
+}
+
+#[post("")]
 pub async fn create(
     req_user: Option<ReqData<TokenClaims>>,
     state: web::Data<State>,
@@ -29,7 +36,7 @@ pub async fn create(
     })?;
     Ok(Json(id))
 }
-#[get("/project/{id}")]
+#[get("/{id}")]
 pub async fn get(
     path: web::Path<ProjectId>,
     req_user: Option<ReqData<TokenClaims>>,
@@ -48,7 +55,7 @@ pub async fn get(
     }))
 }
 
-#[get("/project")]
+#[get("")]
 pub async fn get_all(
     req_user: Option<ReqData<TokenClaims>>,
     state: web::Data<State>,
@@ -69,7 +76,7 @@ pub async fn get_all(
     Ok(Json(projects))
 }
 
-#[delete("/project/{id}")]
+#[delete("/{id}")]
 pub async fn delete(
     path: web::Path<ProjectId>,
     req_user: Option<ReqData<TokenClaims>>,
@@ -83,7 +90,8 @@ pub async fn delete(
         .await
         .map_err(|e| {
             println!("{e}");
-            ProjectError::InternalError})?;
+            ProjectError::InternalError
+        })?;
 
     Ok(Json(proj_id))
 }
