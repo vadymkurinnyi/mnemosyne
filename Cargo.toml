@@ -9,6 +9,7 @@ edition = "2021"
 actix-web = { version = "4", features = ["openssl"] }
 actix = "0.11.0"
 actix-rt = "2.2"
+actix-cors = "0.6.4"
 openssl = { version = "0.10" }
 serde = { version = "1.0.152", features = ["derive"] }
 env_logger = "0.8"
@@ -18,12 +19,22 @@ getset = "0.1.2"
 tokio = { version = "1.24.1", features = ["full"] }
 derive_more = "0.99.17"
 json-patch = "0.3.0"
-serde_json = "1.0.91"
+serde_json = { version = "1.0.91", features = ["raw_value"] }
 anyhow = "1.0.68"
 async-trait = "0.1.61"
 
 # Tokio:
-sqlx = { version = "0.6", features = ["runtime-actix-native-tls", "postgres", "chrono", "offline", "macros", "migrate", "decimal", "json", "uuid"] }
+sqlx = { version = "0.6", features = [
+    "runtime-actix-native-tls",
+    "postgres",
+    "chrono",
+    "offline",
+    "macros",
+    "migrate",
+    "decimal",
+    "json",
+    "uuid",
+] }
 dotenv = "0.15.0"
 dotenvy = "0.15.6"
 actix-identity = "0.5.2"
