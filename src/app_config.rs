@@ -6,7 +6,7 @@ use crate::{
 
 pub struct AppConfig;
 impl Config for AppConfig {
-    type AuthService = AuthServiceImpl<Self>;
+    type AuthService = AuthServiceImpl<Self::UserRepo>;
     type UserRepo = SqlxUserRepository;
     type TaskRepo = SqlxTaskRepository;
     type ProjectRepo = SqlxProjectRepository;

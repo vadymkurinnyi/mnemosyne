@@ -48,12 +48,7 @@ pub trait ProjectRepository {
     async fn get(&self, user_id: UserId, id: ProjectId) -> Result<ProjectDbo>;
     async fn get_all(&self, user_id: UserId) -> Result<Vec<ProjectDbo>>;
     async fn remove(&self, user_id: UserId, id: ProjectId) -> Result<()>;
-    async fn update(
-        &self,
-        user_id: UserId,
-        task: ProjectDbo,
-        old: Option<ProjectDbo>,
-    ) -> Result<()>;
+    async fn update(&self, user_id: UserId, task: ProjectDbo, old: ProjectDbo) -> Result<()>;
 }
 
 pub trait Config {

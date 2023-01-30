@@ -27,7 +27,14 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let logger = Logger::default();
+        let cors = actix_cors::Cors::default()
+            .allow_any_origin()
+            .allow_any_header()
+            .allow_any_method()
+            .supports_credentials();
+
         App::new()
+            .wrap(cors)
             .wrap(logger)
             .configure(|cfg| configure_features(pool.clone(), cfg))
     })
@@ -46,7 +53,7 @@ fn configure_features(pg_pool: PgPool, cfg: &mut web::ServiceConfig) {
 }
 
 fn configure_auth(pg_pool: PgPool, cfg: &mut web::ServiceConfig, f: fn(&mut web::ServiceConfig)) {
-    let auth_service = AuthServiceImpl::<AppConfig> {
+    let auth_service = AuthServiceImpl::<SqlxUserRepository> {
         user_repo: SqlxUserRepository {
             db: pg_pool.clone(),
         },

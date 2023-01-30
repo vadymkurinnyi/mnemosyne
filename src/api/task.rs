@@ -94,12 +94,10 @@ async fn update(
         warn!("{e}");
         TaskError::InvalidPatch
     })?;
-    repo.update(updated, Some(old))
-        .await
-        .map_err(|e| {
-            println!("update: {:?}", e);
-            TaskError::InternalError
-        })?;
+    repo.update(updated, Some(old)).await.map_err(|e| {
+        warn!("update: {:?}", e);
+        TaskError::InternalError
+    })?;
 
     Ok(Json(TaskId::from(uuid)))
 }

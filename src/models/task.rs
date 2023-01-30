@@ -1,7 +1,7 @@
+use crate::generate_update;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
-use crate::generate_update;
 
 #[derive(Deserialize, Serialize)]
 pub struct TaskId {
@@ -27,12 +27,12 @@ pub struct CreateTask {
 }
 
 #[derive(FromRow, Clone, Serialize, Deserialize)]
-pub struct TaskDbo{
+pub struct TaskDbo {
     pub id: Uuid,
     pub project_id: Uuid,
     pub title: String,
     pub description: String,
-    pub completed: bool
+    pub completed: bool,
 }
 
 #[derive(Serialize)]
@@ -40,6 +40,7 @@ pub struct TaskView {
     id: Uuid,
     title: String,
     description: String,
+    completed: bool,
 }
 
 impl From<TaskDbo> for TaskView {
@@ -48,6 +49,7 @@ impl From<TaskDbo> for TaskView {
             id: value.id,
             title: value.title,
             description: value.description,
+            completed: value.completed,
         }
     }
 }

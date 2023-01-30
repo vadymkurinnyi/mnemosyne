@@ -23,8 +23,14 @@ pub fn configure<T, E, R, I>(
     I: 'static + Serialize,
 {
     cfg.app_data(service);
-    cfg.route("/create_user", web::post().to(register::<T, E, I>));
-    cfg.route("/auth", web::get().to(login::<T>));
+    cfg.service(
+        web::scope("/auth")
+            .route("/signup", web::post().to(register::<T, E, I>))
+            .route("/signin", web::get().to(login::<T>)),
+    );
+    // cfg.route("/auth/signup", web::post().to(register::<T, E, I>));
+    // cfg.route("/auth/signin", web::get().to(login::<T>));
+
     use_middleware::<T>(cfg, f);
 }
 fn use_middleware<T: 'static + AuthService<Token = String>>(
@@ -75,7 +81,8 @@ async fn authenticate<T: 'static + AuthService<Token = String>>(
     req: ServiceRequest,
     credetional: BearerAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if req.path() == "/create_user" || req.path() == "/auth" {
+    println!("req.path() = {}", req.path());
+    if req.path() == "/auth/singin" || req.path() == "/auth/signup" {
         return Ok(req);
     }
     let token_string = credetional.token();

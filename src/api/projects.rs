@@ -1,13 +1,15 @@
 use crate::abstractions::{ProjectRepository, TaskRepository};
 use crate::api::errors::ProjectError;
 use crate::app_config::State;
-use crate::models::TokenClaims;
 use crate::models::{CreateProject, ProjectId, ProjectView, ProjectViewWithId, TaskView};
+use crate::models::{ProjectDbo, TokenClaims};
+use actix_web::patch;
 use actix_web::{
     delete, get, post,
     web::{self, Json, ReqData},
     Result,
 };
+use json_patch::{patch, Patch};
 use log::warn;
 
 type ProjectResult<T> = Result<Json<T>, ProjectError>;
@@ -18,7 +20,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(create)
             .service(get)
             .service(delete)
-            .service(get_all),
+            .service(get_all)
+            .service(update),
     );
 }
 
@@ -51,6 +54,7 @@ pub async fn get(
     let (project, tasks) = result.map_err(|_| ProjectError::InternalError)?;
     Ok(Json(ProjectView {
         name: project.name,
+        settings: project.settings.0,
         tasks: tasks.into_iter().map(TaskView::from).collect(),
     }))
 }
@@ -70,6 +74,7 @@ pub async fn get_all(
         .map(|p| ProjectViewWithId {
             id: p.id,
             name: p.name,
+            settings: p.settings.0,
         })
         .collect();
 
@@ -94,4 +99,39 @@ pub async fn delete(
         })?;
 
     Ok(Json(proj_id))
+}
+#[patch("/{id}")]
+async fn update(
+    params: web::Path<ProjectId>,
+    pth: web::Json<Patch>,
+    state: web::Data<State>,
+    req_user: Option<ReqData<TokenClaims>>,
+) -> ProjectResult<ProjectId> {
+    let user = req_user.ok_or(ProjectError::InternalError)?.into_inner();
+    let repo = &state.project_repo;
+    let uuid = params.id;
+    let project = repo.get(user.id, params.into_inner()).await.map_err(|e| {
+        warn!("select: {:?}", e);
+        ProjectError::InternalError
+    })?;
+    let old = project.clone();
+    let mut doc = serde_json::to_value(project).map_err(|e| {
+        warn!("{e}");
+        ProjectError::InternalError
+    })?;
+    patch(&mut doc, &pth).map_err(|e| {
+        warn!("{e}");
+        ProjectError::InvalidPatch
+    })?;
+
+    let updated: ProjectDbo = serde_json::from_value(doc).map_err(|e| {
+        warn!("{e}");
+        ProjectError::InvalidPatch
+    })?;
+    repo.update(user.id, updated, old).await.map_err(|e| {
+        println!("update: {:?}", e);
+        ProjectError::InternalError
+    })?;
+
+    Ok(Json(ProjectId::from(uuid)))
 }

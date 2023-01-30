@@ -33,13 +33,6 @@ macro_rules! generate_update {
                                 _ => format!("'{}'", self.$field)
                             };
 
-//                            let type_name = std::any::type_name::<i32>();
-//                            if std::any::type_name::<i32>() == std::any::type_name::<$typ>() {
-//                                println!("x is an i32");
-//                            } else {
-//                                println!("x is not an i32");
-//                            }
-
                             update.push_str(&format!("SET \"{}\" = {},", stringify!($field), field_value));
                         }
                 )*
@@ -53,12 +46,8 @@ macro_rules! generate_update {
             pub fn get_force_update(&self) -> Option<String> {
                 let mut update = String::new();
                 $(
-                            let field_value = match <$typ>::default() {
-                                _ if std::mem::size_of::<$typ>() == std::mem::size_of::<bool>() => format!("{}", self.$field),
-                                _ => format!("'{}'", self.$field)
-                            };
-
-                            update.push_str(&format!("SET \"{}\" = {},", stringify!($field), field_value));
+                            let field_value = std::string::ToString::to_string(&self.$field);
+                            update.push_str(&format!("SET \"{}\" = '{}',", stringify!($field), field_value));
                 )*
                 if update.is_empty(){
                     None
