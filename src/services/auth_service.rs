@@ -1,17 +1,17 @@
 use crate::{
-    abstractions::{AuthService, Config, Token, UserRepository},
+    abstractions::{AuthService, Token, UserRepository},
     auth::AuthError,
     models::{Credential, Registration, TokenClaims, UserInfo},
 };
 
 use async_trait::async_trait;
 pub type Result<T> = std::result::Result<T, AuthError>;
-pub struct AuthServiceImpl<T: Config> {
-    pub user_repo: <T as Config>::UserRepo,
+pub struct AuthServiceImpl<T: UserRepository> {
+    pub user_repo: T,
 }
 
 #[async_trait]
-impl<T: Config> AuthService for AuthServiceImpl<T> {
+impl<T: UserRepository + Sync + Send> AuthService for AuthServiceImpl<T> {
     type UserId = uuid::Uuid;
     type Error = AuthError;
     type Registration = Registration;
@@ -50,6 +50,7 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
             .await
             .map_err(|e| AuthError::InternalError(e.to_string()))
     }
+
     async fn login(&self, credential: &Credential) -> Result<Token> {
         let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET not specified");
         let auth_info = self
@@ -103,5 +104,5 @@ impl<T: Config> AuthService for AuthServiceImpl<T> {
 
 use chrono::Duration;
 lazy_static::lazy_static! {
-    static ref TOKEN_EXPIRATION: Duration = Duration::minutes(60);
+    static ref TOKEN_EXPIRATION: Duration = Duration::minutes(600);
 }
