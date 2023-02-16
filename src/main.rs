@@ -2,14 +2,18 @@ mod abstractions;
 mod api;
 mod app_config;
 mod auth;
+mod messaging;
 mod models;
 mod repository;
 mod services;
+use std::io;
+
 use actix_web::{middleware::Logger, web, App, HttpServer};
 use api::*;
 use models::{
     abstractions::AppState,
     app_config::AppConfig,
+    messaging::{Messanger, SqsMessanger},
     repository::{SqlxProjectRepository, SqlxTaskRepository, SqlxUserRepository},
     services::auth_service::AuthServiceImpl,
 };
@@ -24,7 +28,12 @@ async fn main() -> std::io::Result<()> {
     repository::processing_migration()
         .await
         .expect("Database migration failed");
-
+    let config = aws_config::from_env().load().await;
+    let aws = SqsMessanger::new(&config)
+        .await
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let aws: Box<dyn Messanger> = Box::new(aws);
+    let messager = web::Data::new(aws);
     HttpServer::new(move || {
         let logger = Logger::default();
         let cors = actix_cors::Cors::default()
@@ -34,6 +43,7 @@ async fn main() -> std::io::Result<()> {
             .supports_credentials();
 
         App::new()
+            .app_data(messager.clone())
             .wrap(cors)
             .wrap(logger)
             .configure(|cfg| configure_features(pool.clone(), cfg))

@@ -1,6 +1,6 @@
 use crate::{
     abstractions::AuthService,
-    models::{AuthToken, Credential},
+    models::{AuthToken, Credential, Messanger},
 };
 use actix_web::web::{self, Json};
 type AuthResonse<T, E> = Result<Json<T>, E>;
@@ -43,6 +43,7 @@ fn use_middleware<T: 'static + AuthService<Token = String>>(
 }
 async fn register<T, E, I>(
     service: web::Data<T>,
+    messager: web::Data<Box<dyn Messanger>>,
     body: Json<T::Registration>,
 ) -> AuthResonse<T::UserId, T::Error>
 where
@@ -50,7 +51,15 @@ where
     E: ResponseError,
     I: Serialize,
 {
-    Ok(Json(service.register(&body).await?))
+    let result = service.register(&body).await?;
+    let message = serde_json::to_string(&result);
+    let result = Json(result);
+    if let Ok(message) = message {
+        if let Err(e) = messager.send_message(&message).await {
+            println!("{:?}", e)
+        }
+    }
+    Ok(result)
 }
 
 use actix_web_httpauth::extractors::basic::BasicAuth;
