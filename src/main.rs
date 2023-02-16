@@ -13,7 +13,7 @@ use api::*;
 use models::{
     abstractions::AppState,
     app_config::AppConfig,
-    messaging::{Messanger, SqsMessanger},
+    messaging::{Messanger, SqsMessanger, UserMessage},
     repository::{SqlxProjectRepository, SqlxTaskRepository, SqlxUserRepository},
     services::auth_service::AuthServiceImpl,
 };
@@ -32,7 +32,7 @@ async fn main() -> std::io::Result<()> {
     let aws = SqsMessanger::new(&config)
         .await
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    let aws: Box<dyn Messanger> = Box::new(aws);
+    let aws: Box<dyn Messanger<Message = UserMessage>> = Box::new(aws);
     let messager = web::Data::new(aws);
     HttpServer::new(move || {
         let logger = Logger::default();

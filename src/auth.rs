@@ -1,6 +1,6 @@
 use crate::{
     abstractions::AuthService,
-    models::{AuthToken, Credential, Messanger},
+    models::{AuthToken, Credential, Messanger, UserMessage},
 };
 use actix_web::web::{self, Json};
 type AuthResonse<T, E> = Result<Json<T>, E>;
@@ -28,8 +28,6 @@ pub fn configure<T, E, R, I>(
             .route("/signup", web::post().to(register::<T, E, I>))
             .route("/signin", web::get().to(login::<T>)),
     );
-    // cfg.route("/auth/signup", web::post().to(register::<T, E, I>));
-    // cfg.route("/auth/signin", web::get().to(login::<T>));
 
     use_middleware::<T>(cfg, f);
 }
@@ -43,7 +41,7 @@ fn use_middleware<T: 'static + AuthService<Token = String>>(
 }
 async fn register<T, E, I>(
     service: web::Data<T>,
-    messager: web::Data<Box<dyn Messanger>>,
+    messager: web::Data<Box<dyn Messanger<Message = UserMessage>>>,
     body: Json<T::Registration>,
 ) -> AuthResonse<T::UserId, T::Error>
 where
@@ -55,7 +53,7 @@ where
     let message = serde_json::to_string(&result);
     let result = Json(result);
     if let Ok(message) = message {
-        if let Err(e) = messager.send_message(&message).await {
+        if let Err(e) = messager.send_message(UserMessage::new(message)).await {
             println!("{:?}", e)
         }
     }
